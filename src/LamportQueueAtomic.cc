@@ -5,11 +5,12 @@
 LamportQueueAtomic::LamportQueueAtomic(queue_idx_t count)
 {
 	capacity_ = next_pow(count);
-	buffer_ = (queue_data_t*)malloc(sizeof(queue_data_t)*capacity_);
+	buffer_ = (queue_data_t*)aligned_alloc(2*CACHELINE, sizeof(queue_data_t)*capacity_);
 	mask_ = capacity_ - 1;
 	head_ = 0;
 	tail_ = 0; 
 }
+
 LamportQueueAtomic::~LamportQueueAtomic()
 {
 	free(buffer_);

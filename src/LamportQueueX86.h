@@ -8,8 +8,8 @@ class LamportQueueX86 final : public Queue {
 	queue_idx_t capacity_;
 	queue_idx_t mask_;
 	alignas(2*CACHELINE) queue_idx_t prod_head_;
-	alignas(2*CACHELINE) queue_idx_t prod_tail_;
-	alignas(2*CACHELINE) queue_idx_t cons_head_;
+	alignas(2*CACHELINE) volatile queue_idx_t prod_tail_;
+	alignas(2*CACHELINE) volatile queue_idx_t cons_head_;
 	alignas(2*CACHELINE) queue_idx_t cons_tail_;
 public:
 	LamportQueueX86(queue_idx_t count);

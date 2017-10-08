@@ -13,7 +13,7 @@ class LamportQueueAtomic final : public Queue {
 public:
 	LamportQueueAtomic(queue_idx_t count);
 	bool enqueue(queue_data_t const& data) override;
-        bool dequeue(queue_data_t& data) override;
+    bool dequeue(queue_data_t& data) override;
 	~LamportQueueAtomic();
 };
 

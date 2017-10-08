@@ -5,8 +5,9 @@
 #include <iostream>
 #include "Queue.h"
 #include "LamportQueueX86.h"
-#include "FastForwardQueue.h"
 #include "LamportQueueAtomic.h"
+#include "FastForwardQueue.h"
+#include "DPDKQueue.h"
 
 #define LOOPSIZE 100000000
 #define SKIPSIZE 10000
@@ -36,15 +37,20 @@ uint64_t tsc()
         return time;
 }
 
+// void wait_tsc()
+// {
+
+// }
+
 void printTimeDuration(TimePoint tstart, TimePoint tend) {
 	auto nano = std::chrono::duration_cast<std::chrono::nanoseconds>(tend - tstart).count();
-	std::cout << "Latency:" << nano / LOOPSIZE << "ns" << std::endl;
+	std::cout << "Latency(?):" << nano / LOOPSIZE << "ns" << std::endl;
 	std::cout << "Throughput:" << LOOPSIZE / (nano * 1e-9) << "op/s" << std::endl;
 }
 
 void printCycleDuration(uint64_t cstart, uint64_t cend) {
 	uint64_t c = cend - cstart;
-	std::cout << "Latency:" << c / LOOPSIZE << "cycles" << std::endl;
+	std::cout << "Latency(?):" << c / LOOPSIZE << "cycles" << std::endl;
 }
 
 void *func1(void* arg) {
@@ -57,10 +63,9 @@ void *func1(void* arg) {
 	for (int i = 0; i < LOOPSIZE + SKIPSIZE; ++i) {
 		if (i == SKIPSIZE) { cstart = tsc(); tstart = Clock::now(); }
 		while (!q.enqueue((queue_data_t)(i+1)));
-		// pthread_yield();
 	}
-	TimePoint tend = Clock::now();
 	uint64_t cend = tsc();
+	TimePoint tend = Clock::now();
 	printTimeDuration(tstart, tend);
 	printCycleDuration(cstart, cend);
 }
@@ -75,7 +80,10 @@ void *func2(void* arg) {
 	for (int i = 0; i < LOOPSIZE + SKIPSIZE; ++i) {
 		// if (i == SKIPSIZE) tstart = Clock::now();
 		while (!q.dequeue(data));
-		// pthread_yield();
+		// if (data != i+1) {
+		// 	fprintf(stderr, "Error: data%llu expect%llu\n", data, i+1);
+		// 	abort();
+		// }
 	}
 	// TimePoint tend = Clock::now();
 	// printTimeDuration(tstart, tend);
@@ -104,11 +112,13 @@ int main(int argc, char const *argv[])
     pthread_barrier_init(&bar, NULL, 2);
 
 	#if defined(WithLamportQueueX86) 
-	LamportQueueX86 q(1<<10);
+	LamportQueueX86 q(1<<14);
 	#elif defined(WithLamportQueueAtomic)
-    LamportQueueAtomic q(1<<10);
+    LamportQueueAtomic q(1<<14);
     #elif defined(WithFastForwardQueue)
 	FastForwardQueue q(1<<14);
+    #elif defined(WithDPDKQueue)
+	DPDKQueue q(1<<14);
     #endif
 
 	Context ctx(q);

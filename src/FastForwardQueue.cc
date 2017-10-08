@@ -2,15 +2,22 @@
 // #include <atomic>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 
 FastForwardQueue::FastForwardQueue(queue_idx_t count)
 {
 	capacity_ = next_pow(count);
-	buffer_ = (queue_data_t*)malloc(sizeof(queue_data_t)*capacity_);
-	// memset()
+	buffer_ = (queue_data_t*)aligned_alloc(2*CACHELINE, sizeof(queue_data_t)*capacity_);
+	memset(buffer_, 0, sizeof(queue_data_t)*capacity_);
 	mask_ = capacity_ - 1;
 	head_ = 0;
-	tail_ = 0; 
+	#ifdef PRODBATCH
+	head_batch_ = 0;
+	#endif
+	tail_ = 0;
+	#ifdef CONSBATCH
+	tail_batch_ = 0;
+	#endif
 }
 FastForwardQueue::~FastForwardQueue()
 {
@@ -19,24 +26,52 @@ FastForwardQueue::~FastForwardQueue()
 
 bool FastForwardQueue::enqueue(queue_data_t const& data)
 {
-	queue_idx_t cur_head = head_;
-	queue_idx_t cur_tail = tail_;
-	if (cur_tail - cur_head >= capacity_)
-		return false; 
-	buffer_[cur_tail & mask_] = data;
-	asm volatile("" ::: "memory");
-	tail_ = cur_tail + 1;
+	#ifdef PRODBATCH	
+	if (tail_ == tail_batch_) {
+		queue_idx_t nxt_tail_batch = tail_batch_ + prod_batch_size;
+		// if ((*(volatile queue_data_t *)(&buffer_[nxt_tail_batch & mask_])) != queue_empty_data)
+		if (buffer_[nxt_tail_batch & mask_] != empty_data)
+			return false;
+		tail_batch_ = nxt_tail_batch;
+	}
+	#else
+	if (buffer_[tail_ & mask_] != empty_data)
+		return false;
+	#endif
+	buffer_[tail_ & mask_] = data;
+	tail_ = tail_ + 1;
 	return true;
 }
 
 bool FastForwardQueue::dequeue(queue_data_t& data) 
 {
-	queue_idx_t cur_head = head_;
-	queue_idx_t cur_tail = tail_;
-	if (cur_head == cur_tail)
+	#ifdef CONSBATCH
+	if (head_ == head_batch_) {
+		if (!backtrack())
+			return false;
+	}
+	#else
+	data = buffer_[head_ & mask_];
+	if (data == empty_data)
 		return false;
-	queue_idx_t cur_indx = cur_head & mask_;
-	data = buffer_[cur_indx];
-	head_ = cur_head + 1;
+	#endif
+	buffer_[head_ & mask_] = empty_data;
+	head_ = head_ + 1;
 	return true;
 }
+
+#ifdef CONSBATCH
+bool FastForwardQueue::backtrack()
+{
+	queue_idx_t batch = cons_batch_size;
+	while (batch) {
+		queue_idx_t nxt_head_batch = head_batch_ + batch;
+		if (buffer_[nxt_head_batch & mask_] != empty_data) {
+			head_batch_ = nxt_head_batch;
+			return true;
+		}
+		batch >>= 1;
+	}
+	return false;
+}
+#endif
