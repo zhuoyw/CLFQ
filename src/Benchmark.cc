@@ -4,10 +4,10 @@
 #include <chrono>
 #include <iostream>
 #include "Queue.h"
-#include "LamportQueueX86.h"
-#include "LamportQueueAtomic.h"
+// #include "LamportQueueX86.h"
+// #include "LamportQueueAtomic.h"
 #include "FastForwardQueue.h"
-#include "DPDKQueue.h"
+// #include "DPDKQueue.h"
 
 #define LOOPSIZE 100000000
 #define SKIPSIZE 10000
@@ -25,22 +25,23 @@ using TimePoint = std::chrono::time_point<Clock>;
 
 uint64_t tsc()
 {
-        uint64_t        time;
-        uint32_t        msw   , lsw;
-        __asm__         __volatile__("rdtsc\n\t"
-                        "movl %%edx, %0\n\t"
-                        "movl %%eax, %1\n\t"
-                        :         "=r"         (msw), "=r"(lsw)
-                        :   
-                        :         "%edx"      , "%eax");
-        time = ((uint64_t) msw << 32) | lsw;
-        return time;
+    uint64_t    time;
+    uint32_t    msw   , lsw;
+    __asm__     __volatile__("rdtsc\n\t"
+                "movl %%edx, %0\n\t"
+                "movl %%eax, %1\n\t"
+                :         "=r"         (msw), "=r"(lsw)
+                :   
+                :         "%edx"      , "%eax");
+    time = ((uint64_t) msw << 32) | lsw;
+    return time;
 }
 
-// void wait_tsc()
-// {
-
-// }
+void spin_tsc(uint64_t count)
+{
+	uint64_t time = tsc() + count;
+	while (tsc() < time) {}
+}
 
 void printTimeDuration(TimePoint tstart, TimePoint tend) {
 	auto nano = std::chrono::duration_cast<std::chrono::nanoseconds>(tend - tstart).count();
@@ -60,9 +61,11 @@ void *func1(void* arg) {
 	pthread_barrier_wait(&bar);
 	TimePoint tstart;
 	uint64_t cstart;
+	queue_msg_t msg;
 	for (int i = 0; i < LOOPSIZE + SKIPSIZE; ++i) {
 		if (i == SKIPSIZE) { cstart = tsc(); tstart = Clock::now(); }
-		while (!q.enqueue((queue_data_t)(i+1)));
+		msg.data[0] = i + 1;
+		while (!q.enqueue(msg));
 	}
 	uint64_t cend = tsc();
 	TimePoint tend = Clock::now();
@@ -76,14 +79,14 @@ void *func2(void* arg) {
 
 	pthread_barrier_wait(&bar);
 	// TimePoint tstart;
-	queue_data_t data;
+	queue_msg_t msg;
 	for (int i = 0; i < LOOPSIZE + SKIPSIZE; ++i) {
 		// if (i == SKIPSIZE) tstart = Clock::now();
-		while (!q.dequeue(data));
-		// if (data != i+1) {
-		// 	fprintf(stderr, "Error: data%llu expect%llu\n", data, i+1);
-		// 	abort();
-		// }
+		while (!q.dequeue(msg));
+		if (msg.data[0] != i+1) {
+			fprintf(stderr, "Error: data%llu expect%llu\n", msg.data[0], i+1);
+			abort();
+		}
 	}
 	// TimePoint tend = Clock::now();
 	// printTimeDuration(tstart, tend);
@@ -112,13 +115,13 @@ int main(int argc, char const *argv[])
     pthread_barrier_init(&bar, NULL, 2);
 
 	#if defined(WithLamportQueueX86) 
-	LamportQueueX86 q(1<<14);
+	LamportQueueX86 q(1<<12);
 	#elif defined(WithLamportQueueAtomic)
-    LamportQueueAtomic q(1<<14);
+    LamportQueueAtomic q(1<<12);
     #elif defined(WithFastForwardQueue)
-	FastForwardQueue q(1<<14);
+	FastForwardQueue q(1<<12);
     #elif defined(WithDPDKQueue)
-	DPDKQueue q(1<<14);
+	DPDKQueue q(1<<12);
     #endif
 
 	Context ctx(q);

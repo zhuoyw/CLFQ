@@ -20,7 +20,7 @@ TARGETS=$(addprefix bin/,$(BINS))
 all: $(TARGETS)
 
 bin/%: src/%.cc src/Benchmark.cc
-	$(CC) $(CFLAGS) $(addprefix -D,With$*) $(addprefix -D,$(CD)) -o $@ $^ $(LDLIBS)
+	$(CC) $(CFLAGS) $(addprefix -D,With$*) $(addprefix -D,$(CPPFLAGS)) -o $@ $^ $(LDLIBS)
 
 clean:
 	rm -f $(TARGETS)
