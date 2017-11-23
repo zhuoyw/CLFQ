@@ -4,8 +4,8 @@
 #include <chrono>
 #include <iostream>
 #include "Queue.h"
-// #include "LamportQueueX86.h"
-// #include "LamportQueueAtomic.h"
+#include "LamportQueueX86.h"
+#include "LamportQueueAtomic.h"
 #include "FastForwardQueue.h"
 // #include "DPDKQueue.h"
 
@@ -58,7 +58,7 @@ void *func1(void* arg) {
 	Context* pctx = (Context*)arg;
 	Queue& q = pctx->q;
 
-	pthread_barrier_wait(&bar);
+	// pthread_barrier_wait(&bar);
 	TimePoint tstart;
 	uint64_t cstart;
 	queue_msg_t msg;
@@ -77,16 +77,16 @@ void *func2(void* arg) {
 	Context* pctx = (Context*)arg;
 	Queue& q = pctx->q;
 
-	pthread_barrier_wait(&bar);
+	// pthread_barrier_wait(&bar);
 	// TimePoint tstart;
 	queue_msg_t msg;
 	for (int i = 0; i < LOOPSIZE + SKIPSIZE; ++i) {
 		// if (i == SKIPSIZE) tstart = Clock::now();
 		while (!q.dequeue(msg));
-		if (msg.data[0] != i+1) {
-			fprintf(stderr, "Error: data%llu expect%llu\n", msg.data[0], i+1);
-			abort();
-		}
+		// if (msg.data[0] != i+1) {
+		// 	fprintf(stderr, "Error: data%llu expect%llu\n", msg.data[0], i+1);
+		// 	abort();
+		// }
 	}
 	// TimePoint tend = Clock::now();
 	// printTimeDuration(tstart, tend);

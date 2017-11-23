@@ -39,17 +39,34 @@ bool FastForwardQueue::enqueue(queue_msg_t const& msg)
 	#endif
 	for (int i = 1; i < QUEUE_MSG_DATASIZE; ++i)
 		buffer_[tail_ & mask_].data[i] = msg.data[i];
-	asm volatile ("" : : : "memory");
+	asm volatile("");
 	buffer_[tail_ & mask_].data[0] = msg.data[0];
 	tail_ = tail_ + 1;
 	return true;
 }
 
+#ifdef PRODBATCH
+bool FastForwardQueue::tail_batch_probe()
+{
+	// queue_idx_t batch = cons_batch_size;
+	// while (true) {
+	// 	queue_idx_t nxt_head_batch = head_batch_ + batch;
+	// 	if (buffer_[nxt_head_batch & mask_].data[0] != empty_data) {
+	// 		// fprintf(stderr, "%lu %lu %lu\n", head_batch_, batch, nxt_head_batch);
+	// 		head_batch_ = nxt_head_batch + 1;
+	// 		return true;
+	// 	}
+	// 	batch >>= 1;
+	// }
+	return false;
+}
+#endif
+
 bool FastForwardQueue::dequeue(queue_msg_t& msg) 
 {
 	#ifdef CONSBATCH
 	if (head_ == head_batch_) {
-		if (!backtrack())
+		if (!head_batch_probe())
 			return false;
 	}
 	#else
@@ -58,13 +75,14 @@ bool FastForwardQueue::dequeue(queue_msg_t& msg)
 	#endif
 	for (int i = 0; i < QUEUE_MSG_DATASIZE; ++i)
 		msg.data[i] = buffer_[head_ & mask_].data[i];
+	asm volatile("");
 	buffer_[head_ & mask_].data[0] = empty_data;
 	head_ = head_ + 1;
 	return true;
 }
 
 #ifdef CONSBATCH
-bool FastForwardQueue::backtrack()
+bool FastForwardQueue::head_batch_probe()
 {
 	queue_idx_t batch = cons_batch_size;
 	while (true) {
